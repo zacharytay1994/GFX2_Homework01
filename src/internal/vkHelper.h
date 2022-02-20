@@ -9,12 +9,6 @@
 
 namespace vkHelper
 {
-	struct vkPipelineData
-	{
-		VkPipeline			pipeline_;
-		VkPipelineLayout	layout_;
-	};
-
 	struct vkSwapChainData
 	{
 		VkSwapchainKHR				swapchain_ { VK_NULL_HANDLE };
@@ -22,6 +16,20 @@ namespace vkHelper
 		VkFormat					format_;
 		std::vector<VkImage>		images_;
 		std::vector<VkImageView>	image_views_;
+	};
+
+	struct vkPipelineData
+	{
+		VkPipeline			pipeline_;
+		VkPipelineLayout	layout_;
+	};
+
+	struct vkSyncObjects
+	{
+		std::vector<VkSemaphore>	available_semaphores_;
+		std::vector<VkSemaphore>	finished_semaphores_;
+		std::vector<VkFence>		in_flight_fences_;
+		std::vector<VkFence>		images_in_flight_;
 	};
 
 	namespace Create
@@ -50,7 +58,10 @@ namespace vkHelper
 
 		VkCommandPool vkCommandPool ( VkPhysicalDevice physicalDevice , VkSurfaceKHR surface , VkDevice logicalDevice );
 
-		
+		bool vkCommandBuffers ( VkDevice logicalDevice , vkSwapChainData swapChain , VkRenderPass renderPass , vkPipelineData graphicsPipeline , std::vector<VkFramebuffer>& framebuffers , VkCommandPool commandPool , std::vector<VkCommandBuffer>& commandBuffers );
+
+		static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+		bool SyncObjects ( VkDevice logicalDevice , vkSwapChainData swapChain , vkSyncObjects& syncObjects );
 	}
 
 	namespace Check
@@ -145,5 +156,10 @@ namespace vkHelper
 	{
 		std::vector<char> ReadFile ( std::string const& filename );
 		VkShaderModule CreateShaderModule ( VkDevice logicalDevice , std::vector<char> const& code );
+	}
+
+	namespace Misc
+	{
+		void DrawFrame ( VkDevice logicalDevice , VkQueue graphicsQueue , VkQueue presentQueue , vkSwapChainData& swapChain , std::vector<VkCommandBuffer>& commandBuffers , vkSyncObjects& syncObjects , size_t& currentFrame );
 	}
 }

@@ -213,6 +213,8 @@ namespace wndHelper
 		width_ = params.width_;
 		height_ = params.height_;
 
+		is_resized_ = false;
+
 		return true;
 	}
 
@@ -223,7 +225,6 @@ namespace wndHelper
 
 	void Window::Update ()
 	{
-		is_resized_ = false;
 
 		while ( !WindowShouldClose () )
 		{

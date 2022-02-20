@@ -18,15 +18,17 @@ namespace wndHelper
 
 		void Update ();
 
+		bool WindowShouldClose ();
+
+		void PollEvents ();
+
 	private:
 		int		width_;
 		int		height_;
 		bool	is_minimized_;
-		bool	is_resized_;
+		bool	is_resized_ { false };
 		HWND	window_handle_;
 		MSG		msg_;
 
-		bool WindowShouldClose ();
-		void PollEvents ();
 	};
 }

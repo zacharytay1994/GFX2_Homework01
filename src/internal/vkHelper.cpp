@@ -629,6 +629,101 @@ namespace vkHelper
 			}
 			return command_pool;
 		}
+
+		bool vkCommandBuffers ( VkDevice logicalDevice , vkSwapChainData swapChain , VkRenderPass renderPass , vkPipelineData graphicsPipeline , std::vector<VkFramebuffer>& framebuffers , VkCommandPool commandPool , std::vector<VkCommandBuffer>& commandBuffers )
+		{
+			commandBuffers.resize ( framebuffers.size () );
+
+			VkCommandBufferAllocateInfo allocInfo {};
+			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.commandPool = commandPool;
+			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandBufferCount = ( uint32_t ) commandBuffers.size ();
+
+			if ( vkAllocateCommandBuffers ( logicalDevice , &allocInfo , commandBuffers.data () ) != VK_SUCCESS )
+			{
+				std::cerr << "vkHelper::Create::vkCommandBuffers failed! Failed to allocate command buffers." << std::endl;
+				return false;
+			}
+
+			for ( size_t i = 0; i < commandBuffers.size (); ++i )
+			{
+				// begin command buffer
+				VkCommandBufferBeginInfo beginInfo {};
+				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				beginInfo.flags = 0;
+				beginInfo.pInheritanceInfo = nullptr;
+
+				if ( vkBeginCommandBuffer ( commandBuffers[ i ] , &beginInfo ) != VK_SUCCESS )
+				{
+					std::cerr << "vkHelper::Create::vkCommandBuffers failed! Failed to begin command buffer." << std::endl;
+					return false;
+				}
+
+				// assign render pass to command buffer and begin render pass
+				VkRenderPassBeginInfo renderPassInfo {};
+				renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				renderPassInfo.renderPass = renderPass;
+				renderPassInfo.framebuffer = framebuffers[ i ];
+				renderPassInfo.renderArea.offset = { 0,0 };
+				renderPassInfo.renderArea.extent = swapChain.extent_;
+
+				VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+				renderPassInfo.clearValueCount = 1;
+				renderPassInfo.pClearValues = &clearColor;
+
+				vkCmdBeginRenderPass ( commandBuffers[ i ] , &renderPassInfo , VK_SUBPASS_CONTENTS_INLINE );
+
+				// bind graphics pipeline
+				vkCmdBindPipeline ( commandBuffers[ i ] , VK_PIPELINE_BIND_POINT_GRAPHICS , graphicsPipeline.pipeline_ );
+
+				// bind draw command
+				// param
+				// 1. command buffer
+				// 2. vertex count
+				// 3. first vertex
+				// 4. first instance
+				vkCmdDraw ( commandBuffers[ i ] , 3 , 1 , 0 , 0 );
+
+				// end render pass
+				vkCmdEndRenderPass ( commandBuffers[ i ] );
+
+				// end command buffer
+				if ( vkEndCommandBuffer ( commandBuffers[ i ] ) != VK_SUCCESS )
+				{
+					std::cerr << "vkHelper::Create::vkEndCommandBuffer failed! Failed to end command buffer." << std::endl;
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool SyncObjects ( VkDevice logicalDevice , vkSwapChainData swapChain , vkSyncObjects& syncObjects )
+		{
+			syncObjects.available_semaphores_.resize ( MAX_FRAMES_IN_FLIGHT );
+			syncObjects.finished_semaphores_.resize ( MAX_FRAMES_IN_FLIGHT );
+			syncObjects.in_flight_fences_.resize ( MAX_FRAMES_IN_FLIGHT );
+			syncObjects.images_in_flight_.resize ( swapChain.images_.size () , VK_NULL_HANDLE );
+
+			VkSemaphoreCreateInfo semaphoreInfo {};
+			semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+			VkFenceCreateInfo fenceInfo {};
+			fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+			fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+			for ( size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i )
+			{
+				if ( vkCreateSemaphore ( logicalDevice , &semaphoreInfo , nullptr , &syncObjects.available_semaphores_[ i ] ) != VK_SUCCESS ||
+					vkCreateSemaphore ( logicalDevice , &semaphoreInfo , nullptr , &syncObjects.finished_semaphores_[ i ] ) != VK_SUCCESS ||
+					vkCreateFence ( logicalDevice , &fenceInfo , nullptr , &syncObjects.in_flight_fences_[ i ] ) != VK_SUCCESS )
+				{
+					std::cerr << "vkHelper::Create::SyncObjects failed! Failed to create semaphore for a frame." << std::endl;
+					return false;
+				}
+			}
+			return true;
+		}
 	}
 
 	namespace Check
@@ -1066,4 +1161,62 @@ namespace vkHelper
 			return shaderModule;
 		}
 	}
+}
+
+void vkHelper::Misc::DrawFrame ( VkDevice logicalDevice , VkQueue graphicsQueue , VkQueue presentQueue , vkSwapChainData& swapChain , std::vector<VkCommandBuffer>& commandBuffers , vkSyncObjects& syncObjects , size_t& currentFrame )
+{
+
+	// wait for frame to be finished before drawing next frame
+	vkWaitForFences ( logicalDevice , 1 , &syncObjects.in_flight_fences_[ currentFrame ] , VK_TRUE , UINT64_MAX );
+
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR ( logicalDevice , swapChain.swapchain_ , UINT64_MAX , syncObjects.available_semaphores_[ currentFrame ] , VK_NULL_HANDLE , &imageIndex );
+
+	// check if the previous frame is using this image
+	if ( syncObjects.images_in_flight_[ imageIndex ] != VK_NULL_HANDLE )
+	{
+		vkWaitForFences ( logicalDevice , 1 , &syncObjects.images_in_flight_[ imageIndex ] , VK_TRUE , UINT64_MAX );
+	}
+
+	// mark image as now being used by this frame
+	syncObjects.images_in_flight_[ imageIndex ] = syncObjects.in_flight_fences_[ currentFrame ];
+
+	// queue submission and synchronization
+	VkSubmitInfo submitInfo {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkSemaphore waitSemaphore[] = { syncObjects.available_semaphores_[ currentFrame ] };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphore;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffers[ imageIndex ];
+
+	VkSemaphore signalSemaphores[] = { syncObjects.finished_semaphores_[ currentFrame ] };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	vkResetFences ( logicalDevice , 1 , &syncObjects.in_flight_fences_[ currentFrame ] );
+
+	if ( vkQueueSubmit ( graphicsQueue , 1 , &submitInfo , syncObjects.in_flight_fences_[ currentFrame ] ) != VK_SUCCESS )
+	{
+		throw std::runtime_error ( "failed to submit draw command buffer!" );
+	}
+
+	VkPresentInfoKHR presentInfo {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+
+	VkSwapchainKHR swapChains[] = { swapChain.swapchain_ };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIndex;
+
+	presentInfo.pResults = nullptr;
+
+	vkQueuePresentKHR ( presentQueue , &presentInfo );
+
+	currentFrame = ( currentFrame + 1 ) % Create::MAX_FRAMES_IN_FLIGHT;
 }

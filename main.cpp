@@ -168,8 +168,44 @@ int main ( int argc , char* argv[] )
 	}
 	std::cout << "### VkCommandPool created successfully." << std::endl;
 
+	// create command buffers
+	std::vector<VkCommandBuffer> vk_command_buffers;
+	if ( !vkHelper::Create::vkCommandBuffers ( vk_logical_device , vk_swapchain_data , vk_render_pass , vk_graphics_pipeline , vk_framebuffers , vk_command_pool , vk_command_buffers ) )
+	{
+		throw std::runtime_error ( "Failed to create command buffers" );
+	}
+	std::cout << "### VkCommandBuffers created successfully." << std::endl;
+
+	// create sync objects
+	vkHelper::vkSyncObjects vk_sync_objects;
+	if ( !vkHelper::Create::SyncObjects ( vk_logical_device , vk_swapchain_data , vk_sync_objects ) )
+	{
+		throw std::runtime_error ( "Failed to create vkSyncObjects" );
+	}
+	std::cout << "### vkSyncObjects created successfully." << std::endl;
+
 	std::cout << "### Setup complete.\n### Press any key to continue!" << std::endl;
-	window.Update ();
+
+	size_t current_frame { 0 };
+	while ( !window.WindowShouldClose () )
+	{
+		window.PollEvents ();
+		if ( window.WindowShouldClose () )
+		{
+			break;
+		}
+
+		// process vulkan draw logic
+		vkHelper::Misc::DrawFrame ( vk_logical_device ,
+			vk_graphics_queue ,
+			vk_present_queue ,
+			vk_swapchain_data ,
+			vk_command_buffers ,
+			vk_sync_objects ,
+			current_frame );
+	}
+
+	vkDeviceWaitIdle ( vk_logical_device );
 
 	return 1;
 }
