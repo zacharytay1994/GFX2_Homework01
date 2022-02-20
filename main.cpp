@@ -144,7 +144,29 @@ int main ( int argc , char* argv[] )
 	}
 	std::cout << "### VkRenderPass created successfully." << std::endl;
 
-	// create 
+	// create graphics pipeline
+	vkHelper::vkPipelineData vk_graphics_pipeline;
+	if ( ( vk_graphics_pipeline = vkHelper::Create::vkGraphicsPipeline ( vk_logical_device , vk_swapchain_data , vk_render_pass ) ).pipeline_ == VK_NULL_HANDLE )
+	{
+		throw std::runtime_error ( "Failed to create VkPipeline" );
+	}
+	std::cout << "### VkGraphicsPipeline created successfully." << std::endl;
+
+	// create swap chain framebuffers
+	std::vector<VkFramebuffer> vk_framebuffers;
+	if ( !vkHelper::Create::vkFramebuffers ( vk_logical_device , vk_swapchain_data , vk_render_pass , vk_framebuffers ) )
+	{
+		throw std::runtime_error ( "Failed to create VkFramebuffers" );
+	}
+	std::cout << "### VkFramebuffers created successfully." << std::endl;
+
+	// create command pool
+	VkCommandPool vk_command_pool;
+	if ( ( vk_command_pool = vkHelper::Create::vkCommandPool ( vk_physical_device , vk_surface , vk_logical_device ) ) == VK_NULL_HANDLE )
+	{
+		throw std::runtime_error ( "Failed to create VkCommandPool" );
+	}
+	std::cout << "### VkCommandPool created successfully." << std::endl;
 
 	std::cout << "### Setup complete.\n### Press any key to continue!" << std::endl;
 	window.Update ();

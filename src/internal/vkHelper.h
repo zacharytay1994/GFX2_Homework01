@@ -40,11 +40,17 @@ namespace vkHelper
 
 		VkQueue				vkPresentQueue ( VkPhysicalDevice physicalDevice , VkSurfaceKHR surface , VkDevice logicalDevice );
 
-		vkSwapChainData		vkSwapChain ( VkPhysicalDevice physicalDevice , VkSurfaceKHR surface , VkDevice logicalDevice  );
+		vkSwapChainData		vkSwapChain ( VkPhysicalDevice physicalDevice , VkSurfaceKHR surface , VkDevice logicalDevice );
 
 		VkRenderPass		vkRenderPass ( VkDevice logicalDevice , VkFormat imageFormat );
 
-		vkPipelineData		vkGraphicsPipeline ();
+		vkPipelineData		vkGraphicsPipeline ( VkDevice logicalDevice , vkSwapChainData swapChainData , VkRenderPass renderPass );
+
+		bool vkFramebuffers ( VkDevice logicalDevice , vkSwapChainData& swapChainData , VkRenderPass renderPass , std::vector<VkFramebuffer>& framebuffers );
+
+		VkCommandPool vkCommandPool ( VkPhysicalDevice physicalDevice , VkSurfaceKHR surface , VkDevice logicalDevice );
+
+		
 	}
 
 	namespace Check
@@ -133,5 +139,11 @@ namespace vkHelper
 		void DestroyDebugUtilsMessengerEXT ( VkInstance instance ,
 			VkDebugUtilsMessengerEXT debugMessenger ,
 			const VkAllocationCallbacks* pAllocator );
+	}
+
+	namespace IO
+	{
+		std::vector<char> ReadFile ( std::string const& filename );
+		VkShaderModule CreateShaderModule ( VkDevice logicalDevice , std::vector<char> const& code );
 	}
 }
